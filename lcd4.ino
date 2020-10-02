@@ -15,7 +15,7 @@ uint8_t buttonStateA,buttonStateB;
 ClickEncoder *encoderA;
 ClickEncoder *encoderB;
 
-byte values[144];
+int vfxValues[144];
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
@@ -30,10 +30,12 @@ void setup() {
 
 
   Serial.begin(9600);
+
+  for (int i=0;i<144;i++) vfxValues[i]=0;
   encoderA = new ClickEncoder(pinA, pinB, pinSw, STEPS);
-  //encoderA->setAccelerationEnabled(true);
+  encoderA->setAccelerationEnabled(false);
   encoderB = new ClickEncoder(A5, A4, A3, STEPS);
-  //encoderB->setAccelerationEnabled(true);
+  encoderB->setAccelerationEnabled(false);
 
   Serial.print("Acceleration is ");
   Serial.println((encoderA->getAccelerationEnabled()) ? "enabled" : "disabled");
@@ -42,41 +44,41 @@ void setup() {
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr); 
 
-  oldEncPosA = -1;
+  oldEncPosA = 0;
+  oldEncPosB = 0;
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
-  // Print a message to the LCD.
   
+  printA();
+  printB();
+}
+
+void clearLcdLine(int num)
+{
+  lcd.setCursor(0, num);
+  lcd.print("                ");
+  lcd.setCursor(0, num);
 }
 
 void loop() {
 
   encPosA += encoderA->getValue();
-  if (encPosA<0) {lcd.clear(); encPosA=143;lcd.print(encPosA);}
-  if (encPosA>143) {lcd.clear(); encPosA=0; lcd.print(encPosA);}
+  encPosB += encoderB->getValue();
+  if (encPosA<0) encPosA=143;
+  if (encPosA>143) encPosA=0; 
+  if (encPosB<0) encPosB=143;
+  if (encPosB>143) encPosB=0; 
+  
 
   if (encPosA != oldEncPosA) {
     oldEncPosA = encPosA;
-    Serial.print("Encoder Value A: ");
-    Serial.println(encPosA);
-    lcd.setCursor(0, 0);
-    lcd.print("                ");
-    lcd.setCursor(0, 0);
-    lcd.print(encPosA+1);
+    printA();
   }
 
-
-  
-  encPosB += encoderB->getValue();
-
-  if (encPosB != oldEncPosB) {
+  if (encPosB != oldEncPosB) {    
     oldEncPosB = encPosB;
-    Serial.print("Encoder Value B: ");
-    Serial.println(encPosB);
-    lcd.setCursor(0, 1);
-    lcd.print("                ");
-    lcd.setCursor(0, 1);
-    lcd.print(encPosB+1);
+    printB();
+    
   }
   
   buttonStateA = encoderA->getButton();
@@ -90,53 +92,63 @@ void loop() {
  
 }
 
-void buttonARotated() 
+void printToRow(char* str, int num)
 {
-  char s[9];
-  numberToFSR(encPosA,s);
-  Serial.print(s);
-  lcd.setCursor(0,0);
-  lcd.print("                ");
-  lcd.setCursor(0,0);
-  lcd.print("FX: ");
-  lcd.print(s);
+  lcd.setCursor(0,num);
+  lcd.print(str);
 }
+
+void printA()
+{
+  clearLcdLine(0);
+  char str[10];
+  numberToFSR(encPosA,str);
+  printToRow(str,0);
+}
+
+void printB()
+{
+  int virtualFxNum;
+  clearLcdLine(1);
+  printToRow("VFX ",1);
+  lcd.print(encPosB+1);
+  lcd.print("=");
+  virtualFxNum=vfxValues[encPosB];
+
+  Serial.print(encPosB);
+  Serial.print("****");
+  Serial.println(virtualFxNum);
+  if (virtualFxNum>=0)
+    {
+      char vstr[10];
+      numberToFSR(virtualFxNum,vstr);
+      lcd.print(vstr);
+    }
+}
+
 void buttonAClicked(){}
-
-
-void buttonBRotated()
-{
-  char s[9];
-  numberToFSR(encPosB,s);
-  Serial.print(s);
-  lcd.setCursor(0,1);
-  lcd.print("                ");
-  lcd.setCursor(0,1);
-  lcd.print("VFX: ");
-  lcd.print(s);
-}
 void buttonBClicked(){}
 
 
 void buttonALongClicked() {}
-void buttonBLongClicked() {}
+void buttonBLongClicked() 
+{
+  vfxValues[encPosB] = encPosA;
+  Serial.print(encPosB);
+  Serial.println(vfxValues[encPosB]);
+  printB();
+}
 
-void numberToFSR(byte num, char* ostr)
+
+
+void numberToFSR(int num, char* ostr)
 {
   char str[10];
-  byte f = (byte)num / 36;
-  byte s = (byte) (  (num % 36)/3);
-  byte r = num %3 ;
+  int f = (int)num / 36;
+  int s = (int) (  (num % 36)/3);
+  int r = num %3 ;
   if (s+1<10) sprintf(str,"F%d:S0%d:R%d\0",f+1,s+1,r+1);
   else sprintf(str,"F%d:S%d:R%d\0",f+1,s+1,r+1);
   Serial.println(str);
-  for(int i=0; i < 9; ++i)ostr[i] = str[i];
-}
-
-char* concat(const char *s1, const char *s2)
-{
-    char *result = malloc(strlen(s1) + strlen(s2) + 1); 
-    strcpy(result, s1);
-    strcat(result, s2);
-    return result;
+  for(int i=0; i < 10; ++i)ostr[i] = str[i];
 }
