@@ -2,10 +2,12 @@
 #include <ClickEncoder.h>
 #include <TimerOne.h>
 #include <LiquidCrystal.h>
+#include <PS2KeyAdvanced.h>
 
 int16_t oldEncPosA, encPosA;
 int16_t oldEncPosB, encPosB;
 uint8_t buttonStateA,buttonStateB;
+
 
 #define pinA A2
 #define pinB A1
@@ -24,6 +26,41 @@ void timerIsr() {
   encoderA->service();
   encoderB->service();
 }
+
+byte row1[8] = {
+  B11111,
+  B11111,
+  B00000,
+  B00000,
+  B00000,
+  B00000,
+  B00000,
+  B00000
+};
+
+byte row2[8] = {
+  B00000,
+  B00000,
+  B00000,
+  B11111,
+  B11111,
+  B00000,
+  B00000,
+  B00000
+};
+
+byte row3[8] = {
+  B00000,
+  B00000,
+  B00000,
+  B00000,
+  B00000,
+  B00000,
+  B11111,
+  B11111
+};
+
+
 
 
 void setup() {
@@ -61,35 +98,11 @@ void clearLcdLine(int num)
 }
 
 void loop() {
-
-  encPosA += encoderA->getValue();
-  encPosB += encoderB->getValue();
-  if (encPosA<0) encPosA=143;
-  if (encPosA>143) encPosA=0; 
-  if (encPosB<0) encPosB=143;
-  if (encPosB>143) encPosB=0; 
+  handleRotation();  
+  handleRotationStatus();
+  handleRotaryButtons();
+  handleKeyboard();
   
-
-  if (encPosA != oldEncPosA) {
-    oldEncPosA = encPosA;
-    printA();
-  }
-
-  if (encPosB != oldEncPosB) {    
-    oldEncPosB = encPosB;
-    printB();
-    
-  }
-  
-  buttonStateA = encoderA->getButton();
-  buttonStateB = encoderB->getButton();
-
-  if (buttonStateA==5) buttonAClicked();
-  if (buttonStateA==4) buttonALongClicked();
-
-  if (buttonStateB==5) buttonBClicked();
-  if (buttonStateB==4) buttonBLongClicked();
- 
 }
 
 void printToRow(char* str, int num)
@@ -104,6 +117,8 @@ void printA()
   char str[10];
   numberToFSR(encPosA,str);
   printToRow(str,0);
+  char a = 175;
+  lcd.print(a);
 }
 
 void printB()
@@ -152,3 +167,14 @@ void numberToFSR(int num, char* ostr)
   Serial.println(str);
   for(int i=0; i < 10; ++i)ostr[i] = str[i];
 }
+
+char getRowChar(int rowVal)
+{
+  switch(rowVal)
+  {
+    case 0: return 175;
+    case 1: return '-';
+    case 2: return '_';
+  }
+  return '^';
+  }
