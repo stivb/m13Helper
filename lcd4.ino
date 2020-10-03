@@ -3,6 +3,7 @@
 #include <TimerOne.h>
 #include <LiquidCrystal.h>
 #include <PS2KeyAdvanced.h>
+#include <EEPROM.h>
 
 int16_t oldEncPosA, encPosA;
 int16_t oldEncPosB, encPosB;
@@ -17,7 +18,7 @@ uint8_t buttonStateA,buttonStateB;
 ClickEncoder *encoderA;
 ClickEncoder *encoderB;
 
-int vfxValues[144];
+byte vfxValues[144];
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
@@ -68,7 +69,9 @@ void setup() {
 
   Serial.begin(9600);
 
-  for (int i=0;i<144;i++) vfxValues[i]=0;
+  EEPROM.get( 0, vfxValues );
+  for (int i=0;i<144;i++) if (vfxValues[i]==255) vfxValues[i]=0;
+  
   encoderA = new ClickEncoder(pinA, pinB, pinSw, STEPS);
   encoderA->setAccelerationEnabled(false);
   encoderB = new ClickEncoder(A5, A4, A3, STEPS);
@@ -114,9 +117,10 @@ void printToRow(char* str, int num)
 void printA()
 {
   clearLcdLine(0);
-  char str[10];
+  char str[7];
   numberToFSR(encPosA,str);
-  printToRow(str,0);
+  lcd.setCursor(0,0);
+  lcd.print(str);
   char a = 175;
   lcd.print(a);
 }
@@ -135,7 +139,7 @@ void printB()
   Serial.println(virtualFxNum);
   if (virtualFxNum>=0)
     {
-      char vstr[10];
+      char vstr[7];
       numberToFSR(virtualFxNum,vstr);
       lcd.print(vstr);
     }
@@ -152,20 +156,21 @@ void buttonBLongClicked()
   Serial.print(encPosB);
   Serial.println(vfxValues[encPosB]);
   printB();
+  EEPROM.put( 0, vfxValues );
 }
 
 
 
 void numberToFSR(int num, char* ostr)
 {
-  char str[10];
+  char str[7];
   int f = (int)num / 36;
   int s = (int) (  (num % 36)/3);
   int r = num %3 ;
-  if (s+1<10) sprintf(str,"F%d:S0%d:R%d\0",f+1,s+1,r+1);
-  else sprintf(str,"F%d:S%d:R%d\0",f+1,s+1,r+1);
+  if (s+1<10) sprintf(str,"%d:0%d:%d\0",f+1,s+1,r+1);
+  else sprintf(str,"%d:%d:%d\0",f+1,s+1,r+1);
   Serial.println(str);
-  for(int i=0; i < 10; ++i)ostr[i] = str[i];
+  for(int i=0; i < sizeof(str)/sizeof(str[0]); ++i)ostr[i] = str[i];
 }
 
 char getRowChar(int rowVal)
